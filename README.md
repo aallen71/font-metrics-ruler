@@ -83,6 +83,15 @@ tsc
 Compiles `src/` to `dist/` per `tsconfig.json`. No dependencies to install
 first.
 
+## Testing
+
+```
+npm test
+```
+
+Compiles, then runs the compiled `*.test.js` files with Node's built-in test
+runner (`node --test`). No test framework dependency.
+
 ## Status
 
 Early skeleton. See the roadmap in the project notes for what's missing —
