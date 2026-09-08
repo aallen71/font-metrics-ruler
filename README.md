@@ -43,6 +43,42 @@ Every character not listed in `advanceWidths` falls back to
 `defaultAdvanceWidth`, so you only need to record the characters that appear
 in your actual copy.
 
+## Getting metrics out of a real font
+
+You don't have to write the metrics JSON by hand. `metricsFromTtf` reads a
+TTF or OTF file's binary tables directly — `head` for `unitsPerEm`, `hmtx`
+for advance widths, `cmap` to map characters to glyphs, `name` for the family
+name — and builds a `FontMetrics` from them:
+
+```ts
+import { readFileSync } from "node:fs";
+import { metricsFromTtf } from "font-metrics-ruler";
+
+const metrics = metricsFromTtf(readFileSync("Inter-Regular.ttf"));
+```
+
+By default it extracts printable ASCII (0x20-0x7E). Pass `characters` to
+extract a different set:
+
+```ts
+metricsFromTtf(fontData, { characters: "Hello, world!" });
+```
+
+`defaultAdvanceWidth` comes from glyph 0, the font's `.notdef` glyph — the
+glyph that would actually render for a character missing from
+`advanceWidths`.
+
+There's also a small script to do this from the command line and print the
+resulting JSON:
+
+```
+node dist/extract-metrics.js Inter-Regular.ttf > inter-metrics.json
+node dist/extract-metrics.js Inter-Regular.ttf "Hello, world!" > inter-hello.json
+```
+
+OpenType font collections (`.ttc`) aren't supported — pick a single font
+file out of one first.
+
 ## How the metrics file is structured
 
 - `unitsPerEm` — the design grid the font was drawn on (commonly 1000 or
@@ -70,6 +106,8 @@ arithmetic every text layout engine does internally.
   measurement to pixels.
 - `advanceWidthOf(metrics, char): number` — the advance width of a single
   character, in font units.
+- `metricsFromTtf(data: Uint8Array, options?: TtfExtractOptions): FontMetrics`
+  — build metrics by reading a TTF/OTF file's own tables.
 
 Every function here is pure: no globals, no I/O, same input always produces
 the same output. `FontMetrics` values are immutable once built.
@@ -94,10 +132,9 @@ runner (`node --test`). No test framework dependency.
 
 ## Status
 
-Early skeleton. See the roadmap in the project notes for what's missing —
-notably, there's no tool yet to extract `advanceWidths` from a real font
-file, so you currently have to build that JSON by hand or from another
-utility.
+Early skeleton. Kerning pairs aren't supported yet — `measureTextWidth` sums
+independent per-character advance widths, so fonts that rely heavily on
+kerning will be measured slightly wide or narrow.
 
 ## License
 
