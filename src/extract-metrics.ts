@@ -13,6 +13,11 @@ function main(argv: readonly string[]): void {
   const fontData = readFileSync(fontPath);
   const metrics = metricsFromTtf(fontData, characterArg ? { characters: Array.from(characterArg) } : {});
 
+  const kerningPairs: Record<string, Record<string, number>> = {};
+  for (const [left, adjustments] of metrics.kerningPairs) {
+    kerningPairs[left] = Object.fromEntries(adjustments);
+  }
+
   process.stdout.write(
     JSON.stringify(
       {
@@ -20,6 +25,7 @@ function main(argv: readonly string[]): void {
         unitsPerEm: metrics.unitsPerEm,
         defaultAdvanceWidth: metrics.defaultAdvanceWidth,
         advanceWidths: Object.fromEntries(metrics.advanceWidths),
+        kerningPairs,
       },
       null,
       2

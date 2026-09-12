@@ -14,6 +14,13 @@ export interface FontMetrics {
   readonly defaultAdvanceWidth: number;
   /** Advance width in font units, keyed by single character. */
   readonly advanceWidths: ReadonlyMap<string, number>;
+  /**
+   * Per-pair adjustment to the gap between two adjacent characters, in font
+   * units, keyed by the left character then the right character. Negative
+   * values pull characters closer together (e.g. "AV"), positive values push
+   * them apart. Pairs not present here have no adjustment.
+   */
+  readonly kerningPairs: ReadonlyMap<string, ReadonlyMap<string, number>>;
 }
 
 export interface RawFontMetrics {
@@ -21,6 +28,7 @@ export interface RawFontMetrics {
   unitsPerEm: number;
   defaultAdvanceWidth: number;
   advanceWidths: Record<string, number>;
+  kerningPairs?: Record<string, Record<string, number>>;
 }
 
 /**
@@ -64,10 +72,31 @@ export function metricsFromRaw(raw: RawFontMetrics): FontMetrics {
     advanceWidths.set(char, width);
   }
 
+  const kerningPairs = new Map<string, ReadonlyMap<string, number>>();
+  if (raw.kerningPairs !== undefined) {
+    if (typeof raw.kerningPairs !== "object" || raw.kerningPairs === null) {
+      throw new Error("font metrics: kerningPairs must be an object");
+    }
+    for (const [left, rightAdjustments] of Object.entries(raw.kerningPairs)) {
+      if (typeof rightAdjustments !== "object" || rightAdjustments === null) {
+        throw new Error(`font metrics: kerningPairs["${left}"] must be an object`);
+      }
+      const adjustments = new Map<string, number>();
+      for (const [right, adjustment] of Object.entries(rightAdjustments)) {
+        if (typeof adjustment !== "number" || !Number.isFinite(adjustment)) {
+          throw new Error(`font metrics: kerning adjustment for "${left}" + "${right}" must be a finite number`);
+        }
+        adjustments.set(right, adjustment);
+      }
+      kerningPairs.set(left, adjustments);
+    }
+  }
+
   return {
     familyName: raw.familyName,
     unitsPerEm: raw.unitsPerEm,
     defaultAdvanceWidth: raw.defaultAdvanceWidth,
     advanceWidths,
+    kerningPairs,
   };
 }

@@ -56,3 +56,38 @@ test("metricsFromRaw rejects a negative advance width for a character", () => {
     /advance width for "H" must be a non-negative number/
   );
 });
+
+test("metricsFromRaw defaults to an empty kerningPairs map when omitted", () => {
+  const metrics = metricsFromRaw(validRaw);
+  assert.equal(metrics.kerningPairs.size, 0);
+});
+
+test("metricsFromRaw parses nested kerningPairs", () => {
+  const metrics = metricsFromRaw({ ...validRaw, kerningPairs: { A: { V: -80 } } });
+  assert.equal(metrics.kerningPairs.get("A")?.get("V"), -80);
+});
+
+test("metricsFromRaw rejects a non-object kerningPairs", () => {
+  assert.throws(
+    () => metricsFromRaw({ ...validRaw, kerningPairs: "nope" as unknown as Record<string, Record<string, number>> }),
+    /kerningPairs must be an object/
+  );
+});
+
+test("metricsFromRaw rejects a non-object kerningPairs entry", () => {
+  assert.throws(
+    () =>
+      metricsFromRaw({
+        ...validRaw,
+        kerningPairs: { A: -80 } as unknown as Record<string, Record<string, number>>,
+      }),
+    /kerningPairs\["A"\] must be an object/
+  );
+});
+
+test("metricsFromRaw rejects a non-finite kerning adjustment", () => {
+  assert.throws(
+    () => metricsFromRaw({ ...validRaw, kerningPairs: { A: { V: NaN } } }),
+    /kerning adjustment for "A" \+ "V" must be a finite number/
+  );
+});

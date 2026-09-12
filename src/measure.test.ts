@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { FontMetrics } from "./metrics.js";
-import { advanceWidthOf, measureTextWidth, textWidthInUnits, unitsToPixels } from "./measure.js";
+import { advanceWidthOf, kerningAdjustmentOf, measureTextWidth, textWidthInUnits, unitsToPixels } from "./measure.js";
 
 const metrics: FontMetrics = {
   familyName: "Test Sans",
@@ -10,9 +10,12 @@ const metrics: FontMetrics = {
   advanceWidths: new Map([
     ["H", 700],
     ["i", 200],
+    ["A", 700],
+    ["V", 700],
     [" ", 250],
     ["\u{1F600}", 900], // grinning face, outside the BMP
   ]),
+  kerningPairs: new Map([["A", new Map([["V", -80]])]]),
 };
 
 test("advanceWidthOf returns the recorded width", () => {
@@ -66,4 +69,26 @@ test("measureTextWidth treats a code point outside the BMP as a single character
 test("measureTextWidth throws for a non-positive fontSizePx", () => {
   assert.throws(() => measureTextWidth(metrics, "Hi", 0), /fontSizePx must be positive/);
   assert.throws(() => measureTextWidth(metrics, "Hi", -1), /fontSizePx must be positive/);
+});
+
+test("kerningAdjustmentOf returns the recorded adjustment", () => {
+  assert.equal(kerningAdjustmentOf(metrics, "A", "V"), -80);
+});
+
+test("kerningAdjustmentOf returns 0 for a pair with no recorded adjustment", () => {
+  assert.equal(kerningAdjustmentOf(metrics, "H", "i"), 0);
+  assert.equal(kerningAdjustmentOf(metrics, "z", "z"), 0);
+});
+
+test("textWidthInUnits applies the kerning adjustment between an adjacent pair", () => {
+  assert.equal(textWidthInUnits(metrics, "AV"), 700 + 700 - 80);
+});
+
+test("textWidthInUnits only applies kerning to characters that are actually adjacent", () => {
+  assert.equal(textWidthInUnits(metrics, "A V"), 700 + 250 + 700);
+});
+
+test("measureTextWidth folds kerning adjustments into the pixel width", () => {
+  const widthPx = measureTextWidth(metrics, "AV", 10);
+  assert.equal(widthPx, ((700 + 700 - 80) / 1000) * 10);
 });

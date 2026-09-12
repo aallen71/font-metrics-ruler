@@ -29,6 +29,9 @@ const metrics = parseMetrics(`{
     "l": 222,
     "o": 611,
     " ": 250
+  },
+  "kerningPairs": {
+    "H": { "e": -20 }
   }
 }`);
 
@@ -42,6 +45,12 @@ measureTextWidth(metrics, "Hello", 16, { letterSpacingPx: 1 });
 Every character not listed in `advanceWidths` falls back to
 `defaultAdvanceWidth`, so you only need to record the characters that appear
 in your actual copy.
+
+`kerningPairs` is optional and adjusts the gap between specific adjacent
+character pairs — negative to pull them closer (like "H" followed by "e"
+above), positive to push them apart. Pairs not listed have no adjustment.
+`measureTextWidth` and `textWidthInUnits` apply it automatically wherever a
+listed pair occurs in the text.
 
 ## Getting metrics out of a real font
 
@@ -68,6 +77,11 @@ metricsFromTtf(fontData, { characters: "Hello, world!" });
 glyph that would actually render for a character missing from
 `advanceWidths`.
 
+`kerningPairs` is populated from the font's legacy `kern` table when it has
+one. Only the older, widely-supported version-0 format is read; fonts that
+carry kerning exclusively in OpenType `GPOS` (most modern ones) won't
+produce any pairs this way, and you'd need to supply them by hand.
+
 There's also a small script to do this from the command line and print the
 resulting JSON:
 
@@ -87,6 +101,8 @@ file out of one first.
   font units, keyed by the literal character.
 - `defaultAdvanceWidth` — used for any character missing from
   `advanceWidths`.
+- `kerningPairs` — optional per-pair adjustments, in font units, keyed by the
+  left character then the right character.
 
 `measureTextWidth` converts to pixels with
 `(sum of advance widths / unitsPerEm) * fontSizePx`, which is the same
@@ -106,6 +122,9 @@ arithmetic every text layout engine does internally.
   measurement to pixels.
 - `advanceWidthOf(metrics, char): number` — the advance width of a single
   character, in font units.
+- `kerningAdjustmentOf(metrics, left, right): number` — the kerning
+  adjustment between a pair of adjacent characters, in font units, or `0` if
+  the pair has none.
 - `metricsFromTtf(data: Uint8Array, options?: TtfExtractOptions): FontMetrics`
   — build metrics by reading a TTF/OTF file's own tables.
 
@@ -132,9 +151,10 @@ runner (`node --test`). No test framework dependency.
 
 ## Status
 
-Early skeleton. Kerning pairs aren't supported yet — `measureTextWidth` sums
-independent per-character advance widths, so fonts that rely heavily on
-kerning will be measured slightly wide or narrow.
+Early skeleton. `measureTextWidth` applies kerning pairs when they're present
+in the metrics, but `metricsFromTtf` can only pull them from a font's legacy
+`kern` table — fonts that rely on OpenType `GPOS` kerning instead (most
+current ones) will still be measured without it.
 
 ## License
 

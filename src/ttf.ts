@@ -40,11 +40,12 @@ export function metricsFromTtf(data: Uint8Array, options: TtfExtractOptions = {}
   const advanceWidthsByGlyph = readAdvanceWidths(sfnt);
   const cmap = readCmap(sfnt);
   const familyName = readFamilyName(sfnt);
+  const characters = Array.from(options.characters ?? DEFAULT_CHARACTERS);
 
   const defaultAdvanceWidth = advanceWidthsByGlyph[0] ?? 0;
 
   const advanceWidths: Record<string, number> = {};
-  for (const char of options.characters ?? DEFAULT_CHARACTERS) {
+  for (const char of characters) {
     const codePoint = char.codePointAt(0);
     if (codePoint === undefined) continue;
 
@@ -57,7 +58,9 @@ export function metricsFromTtf(data: Uint8Array, options: TtfExtractOptions = {}
     advanceWidths[char] = width;
   }
 
-  const raw: RawFontMetrics = { familyName, unitsPerEm, defaultAdvanceWidth, advanceWidths };
+  const kerningPairs = readKerningPairs(sfnt, cmap, characters);
+
+  const raw: RawFontMetrics = { familyName, unitsPerEm, defaultAdvanceWidth, advanceWidths, kerningPairs };
   return metricsFromRaw(raw);
 }
 
@@ -140,6 +143,82 @@ function readAdvanceWidths(sfnt: Sfnt): readonly number[] {
   }
 
   return widths;
+}
+
+/**
+ * Reads horizontal kerning pairs from the font's legacy "kern" table, if it
+ * has one, restricted to the characters being extracted. Only version-0
+ * (Windows-style) format-0 subtables are understood — that's the common case
+ * for fonts that carry legacy kerning at all. Fonts that rely on OpenType
+ * GPOS kerning instead (most modern ones) yield no pairs here; there's no
+ * "kern" table to read.
+ */
+function readKerningPairs(
+  sfnt: Sfnt,
+  cmap: ReadonlyMap<number, number>,
+  characters: readonly string[]
+): Record<string, Record<string, number>> {
+  const kerningPairs: Record<string, Record<string, number>> = {};
+
+  const kernTable = sfnt.tables.get("kern");
+  if (!kernTable) return kerningPairs;
+
+  const view = sfnt.view;
+  const version = view.getUint16(kernTable.offset);
+  if (version !== 0) return kerningPairs; // AAT-style kern tables (version 1) aren't supported
+
+  const glyphIdToChar = new Map<number, string>();
+  for (const char of characters) {
+    const codePoint = char.codePointAt(0);
+    if (codePoint === undefined) continue;
+    const glyphId = cmap.get(codePoint);
+    if (glyphId !== undefined) glyphIdToChar.set(glyphId, char);
+  }
+
+  const numSubtables = view.getUint16(kernTable.offset + 2);
+  let subtableOffset = kernTable.offset + 4;
+  for (let i = 0; i < numSubtables; i++) {
+    const length = view.getUint16(subtableOffset + 2);
+    const coverage = view.getUint16(subtableOffset + 4);
+    const format = coverage >> 8;
+    const isHorizontal = (coverage & 0x1) !== 0;
+    const isMinimum = (coverage & 0x2) !== 0;
+    const isCrossStream = (coverage & 0x4) !== 0;
+
+    if (format === 0 && isHorizontal && !isMinimum && !isCrossStream) {
+      readKernSubtableFormat0(view, subtableOffset + 6, glyphIdToChar, kerningPairs);
+    }
+
+    subtableOffset += length;
+  }
+
+  return kerningPairs;
+}
+
+/** Reads a format-0 kern subtable's flat array of (leftGlyph, rightGlyph, value) triples. */
+function readKernSubtableFormat0(
+  view: DataView,
+  offset: number,
+  glyphIdToChar: ReadonlyMap<number, string>,
+  kerningPairs: Record<string, Record<string, number>>
+): void {
+  const numPairs = view.getUint16(offset);
+  let pairOffset = offset + 8; // skip nPairs, searchRange, entrySelector, rangeShift
+
+  for (let i = 0; i < numPairs; i++) {
+    const leftGlyph = view.getUint16(pairOffset);
+    const rightGlyph = view.getUint16(pairOffset + 2);
+    const value = view.getInt16(pairOffset + 4);
+    pairOffset += 6;
+
+    if (value === 0) continue;
+    const leftChar = glyphIdToChar.get(leftGlyph);
+    const rightChar = glyphIdToChar.get(rightGlyph);
+    if (leftChar === undefined || rightChar === undefined) continue;
+
+    const adjustments = kerningPairs[leftChar] ?? (kerningPairs[leftChar] = {});
+    adjustments[rightChar] = (adjustments[rightChar] ?? 0) + value;
+  }
 }
 
 /** Maps Unicode code points to glyph IDs via the font's cmap table. */
