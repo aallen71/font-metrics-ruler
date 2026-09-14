@@ -40,6 +40,9 @@ measureTextWidth(metrics, "Hello", 16);
 
 measureTextWidth(metrics, "Hello", 16, { letterSpacingPx: 1 });
 // -> same, with 1px added between each pair of characters
+
+truncateToWidth(metrics, "Hello, world!", 16, 60);
+// -> as much of the string as fits in 60px, plus "…" if it had to cut
 ```
 
 Every character not listed in `advanceWidths` falls back to
@@ -125,6 +128,11 @@ arithmetic every text layout engine does internally.
 - `kerningAdjustmentOf(metrics, left, right): number` — the kerning
   adjustment between a pair of adjacent characters, in font units, or `0` if
   the pair has none.
+- `truncateToWidth(metrics, text, fontSizePx, maxWidthPx, options?): string`
+  — `text` unchanged if it already fits in `maxWidthPx`, otherwise the
+  longest prefix that fits alongside an ellipsis (`options.ellipsis`,
+  default `"…"`), with that ellipsis appended. Returns `""` if even the
+  ellipsis doesn't fit.
 - `metricsFromTtf(data: Uint8Array, options?: TtfExtractOptions): FontMetrics`
   — build metrics by reading a TTF/OTF file's own tables.
 

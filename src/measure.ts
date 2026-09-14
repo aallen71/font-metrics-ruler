@@ -67,3 +67,65 @@ function codePointCount(text: string): number {
   for (const _ of text) count++;
   return count;
 }
+
+export interface TruncateOptions extends MeasureOptions {
+  /** Appended to a truncated string. Defaults to "…". Pass "" to truncate without one. */
+  readonly ellipsis?: string;
+}
+
+/**
+ * Returns `text` unchanged if it already fits within `maxWidthPx`, otherwise
+ * the longest leading slice that fits alongside `options.ellipsis` (default
+ * "…"), with that ellipsis appended. Returns "" if even the ellipsis alone
+ * doesn't fit.
+ *
+ * Walks code points once, reusing the same per-character width and kerning
+ * math as measureTextWidth, so a prefix's width is exact rather than an
+ * estimate from average character width.
+ */
+export function truncateToWidth(
+  metrics: FontMetrics,
+  text: string,
+  fontSizePx: number,
+  maxWidthPx: number,
+  options: TruncateOptions = {}
+): string {
+  if (!(fontSizePx > 0)) {
+    throw new Error("truncateToWidth: fontSizePx must be positive");
+  }
+  if (!(maxWidthPx >= 0)) {
+    throw new Error("truncateToWidth: maxWidthPx must not be negative");
+  }
+
+  if (measureTextWidth(metrics, text, fontSizePx, options) <= maxWidthPx) {
+    return text;
+  }
+
+  const ellipsis = options.ellipsis ?? "…";
+  const ellipsisWidthPx = ellipsis.length > 0 ? measureTextWidth(metrics, ellipsis, fontSizePx, options) : 0;
+  if (ellipsisWidthPx > maxWidthPx) {
+    return "";
+  }
+
+  const budgetPx = maxWidthPx - ellipsisWidthPx;
+  const letterSpacingPx = options.letterSpacingPx ?? 0;
+  const chars = Array.from(text);
+
+  let widthPx = 0;
+  let previous: string | undefined;
+  let fitCount = 0;
+
+  for (const char of chars) {
+    const unitsWidth = advanceWidthOf(metrics, char) + (previous === undefined ? 0 : kerningAdjustmentOf(metrics, previous, char));
+    const gapPx = fitCount > 0 ? letterSpacingPx : 0;
+    const candidateWidthPx = widthPx + unitsToPixels(unitsWidth, metrics, fontSizePx) + gapPx;
+    if (candidateWidthPx > budgetPx) {
+      break;
+    }
+    widthPx = candidateWidthPx;
+    previous = char;
+    fitCount++;
+  }
+
+  return chars.slice(0, fitCount).join("") + ellipsis;
+}

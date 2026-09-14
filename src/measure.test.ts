@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { FontMetrics } from "./metrics.js";
-import { advanceWidthOf, kerningAdjustmentOf, measureTextWidth, textWidthInUnits, unitsToPixels } from "./measure.js";
+import {
+  advanceWidthOf,
+  kerningAdjustmentOf,
+  measureTextWidth,
+  textWidthInUnits,
+  truncateToWidth,
+  unitsToPixels,
+} from "./measure.js";
 
 const metrics: FontMetrics = {
   familyName: "Test Sans",
@@ -91,4 +98,40 @@ test("textWidthInUnits only applies kerning to characters that are actually adja
 test("measureTextWidth folds kerning adjustments into the pixel width", () => {
   const widthPx = measureTextWidth(metrics, "AV", 10);
   assert.equal(widthPx, ((700 + 700 - 80) / 1000) * 10);
+});
+
+test("truncateToWidth returns the text unchanged when it already fits", () => {
+  assert.equal(truncateToWidth(metrics, "Hi", 10, 100), "Hi");
+});
+
+test("truncateToWidth cuts to the longest prefix that fits alongside the ellipsis", () => {
+  // "H" is 7px, "i" is 2px, the default ellipsis falls back to defaultAdvanceWidth (5px).
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 13), "H…");
+});
+
+test("truncateToWidth with an empty ellipsis uses the full budget for the prefix", () => {
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 9, { ellipsis: "" }), "Hi");
+});
+
+test("truncateToWidth returns an empty string when even the ellipsis doesn't fit", () => {
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 1), "");
+});
+
+test("truncateToWidth accounts for letterSpacingPx when fitting the prefix", () => {
+  // Without spacing "Hi" (9px) plus the 5px ellipsis fits in 14px; a 3px gap after "H" pushes it out.
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 14), "Hi…");
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 14, { letterSpacingPx: 3 }), "H…");
+});
+
+test("truncateToWidth honors a custom ellipsis string", () => {
+  // "." also falls back to defaultAdvanceWidth (5px), same budget math as the default ellipsis case.
+  assert.equal(truncateToWidth(metrics, "HiHi", 10, 14, { ellipsis: "." }), "Hi.");
+});
+
+test("truncateToWidth throws for a non-positive fontSizePx", () => {
+  assert.throws(() => truncateToWidth(metrics, "Hi", 0, 10), /fontSizePx must be positive/);
+});
+
+test("truncateToWidth throws for a negative maxWidthPx", () => {
+  assert.throws(() => truncateToWidth(metrics, "Hi", 10, -1), /maxWidthPx must not be negative/);
 });
