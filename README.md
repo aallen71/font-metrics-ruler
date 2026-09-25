@@ -96,6 +96,23 @@ node dist/extract-metrics.js Inter-Regular.ttf "Hello, world!" > inter-hello.jso
 OpenType font collections (`.ttc`) aren't supported — pick a single font
 file out of one first.
 
+## Measuring text from the command line
+
+For a one-off measurement without writing any code, `measure-text` takes a
+metrics JSON file, a string, and a font size, and prints the width:
+
+```
+node dist/measure-text.js inter-metrics.json "Hello, world!" 16
+# -> prints the width in pixels
+
+node dist/measure-text.js inter-metrics.json "Hello, world!" 16 --letter-spacing 1
+node dist/measure-text.js inter-metrics.json "Hello, world!" 16 --truncate 60
+node dist/measure-text.js inter-metrics.json "Hello, world!" 16 --truncate 60 --ellipsis ...
+```
+
+`--truncate maxWidthPx` prints the truncated string instead of a width, using
+the same rules as `truncateToWidth`.
+
 ## How the metrics file is structured
 
 - `unitsPerEm` — the design grid the font was drawn on (commonly 1000 or
