@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { parseMetrics } from "./metrics.js";
 import { measureTextWidth, truncateToWidth } from "./measure.js";

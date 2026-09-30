@@ -2,14 +2,32 @@
   "name": "font-metrics-ruler",
   "version": "0.1.0",
   "description": "Answers one question: how wide will this text render, given a font's metrics?",
+  "keywords": ["font", "text", "width", "metrics", "kerning", "ttf", "truncate"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "extract-metrics": "dist/extract-metrics.js",
+    "measure-text": "dist/measure-text.js"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
+  "sideEffects": false,
   "license": "MIT",
   "author": "aallen71",
   "scripts": {
     "build": "tsc",
-    "test": "tsc && node --test dist"
+    "test": "tsc && node --test dist",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=18"

@@ -156,6 +156,17 @@ arithmetic every text layout engine does internally.
 Every function here is pure: no globals, no I/O, same input always produces
 the same output. `FontMetrics` values are immutable once built.
 
+## Installing
+
+```
+npm install font-metrics-ruler
+```
+
+The package installs two commands, `extract-metrics` and `measure-text`, which
+are the same scripts described above (`node dist/extract-metrics.js` and
+`node dist/measure-text.js`). The published package contains only the
+compiled `dist/` output, without the test files.
+
 ## Building
 
 ```
